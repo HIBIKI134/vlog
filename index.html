@@ -1,1 +1,69 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+      .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 300px; text-align: center; }
+      h2 { color: #333; margin-bottom: 20px; }
+      input { width: 90%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
+      
+      /* ボタンとローディングのエリア */
+      .button-area { position: relative; height: 45px; }
+      button { width: 100%; padding: 12px; background-color: #1a73e8; color: white; border: none; border-radius: 0px; font-size: 16px; cursor: pointer; }
+      
+      /* くるくるアニメーションの作成 */
+      .loader {
+        display: none; /* 最初は隠しておく */
+        width: 25px; height: 25px;
+        border: 3px solid #f3f3f3; border-top: 3px solid #1a73e8;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
+      #msg { color: #d93025; font-size: 14px; margin-top: 15px; min-height: 20px; }
+    </style>
+  </head>
+  <body>
+    <div class="login-card">
+      <h2>新聞係専用</h2>
+      <input type="password" id="pass" placeholder="パスワードを入力" onkeypress="if(event.key==='Enter')login()">
+      
+      <div class="button-area">
+        <button id="btn" onclick="login()">ログイン</button>
+        <div id="loader" class="loader"></div>
+      </div>
+      
+      <div id="msg"></div>
+    </div>
+
+    <script>
+      function login() {
+        const pass = document.getElementById('pass').value;
+        const btn = document.getElementById('btn');
+        const loader = document.getElementById('loader');
+        const msg = document.getElementById('msg');
+
+        // ボタンを消してローディングを表示
+        btn.style.display = 'none';
+        loader.style.display = 'block';
+        msg.innerText = "";
+        
+        google.script.run.withSuccessHandler(url => {
+          if (url === "error") {
+            // エラーならボタンを戻す
+            btn.style.display = 'block';
+            loader.style.display = 'none';
+            msg.innerText = "パスワードが正しくありません";
+          } else {
+            msg.style.color = "#188038";
+            msg.innerText = "しばらくお待ち下さい...";
+            window.top.location.href = url;
+          }
+        }).checkPassword(pass);
+      }
+    </script>
+  </body>
+</html>
