@@ -1,69 +1,507 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SECOM Style Home Controller</title>
     <style>
-      body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
-      .login-card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 300px; text-align: center; }
-      h2 { color: #333; margin-bottom: 20px; }
-      input { width: 90%; padding: 12px; margin-bottom: 20px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
-      
-      /* ボタンとローディングのエリア */
-      .button-area { position: relative; height: 45px; }
-      button { width: 100%; padding: 12px; background-color: #1a73e8; color: white; border: none; border-radius: 0px; font-size: 16px; cursor: pointer; }
-      
-      /* くるくるアニメーションの作成 */
-      .loader {
-        display: none; /* 最初は隠しておく */
-        width: 25px; height: 25px;
-        border: 3px solid #f3f3f3; border-top: 3px solid #1a73e8;
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin: 0 auto;
-      }
-      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        :root {
+            --secom-white: #f5f6f8;
+            --panel-bg: #ffffff;
+            --screen-bg: #090f1d;
+            --text-dark: #333333;
+            --text-light: #ffffff;
+            --accent-red: #ff3b30;
+            --accent-blue: #007aff;
+            --border-color: #d1d1d6;
+        }
 
-      #msg { color: #d93025; font-size: 14px; margin-top: 15px; min-height: 20px; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #e5e5ea;
+            color: var(--text-dark);
+            margin: 0;
+            padding: 10px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* 実物の壁掛け端末を再現した外枠 */
+        .secom-hardware {
+            width: 100%;
+            max-width: 480px;
+            background-color: var(--panel-bg);
+            border-radius: 12px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            border: 1px solid var(--border-color);
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .hardware-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            font-weight: bold;
+            font-size: 14px;
+            color: #666;
+        }
+
+        /* 端末中央の液晶画面エリア */
+        .液晶画面 {
+            background-color: var(--screen-bg);
+            border-radius: 6px;
+            padding: 15px;
+            height: 200px;
+            position: relative;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.5);
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+
+        video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            opacity: 0.4; /* 実物の液晶っぽく少し背景に沈める */
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .screen-overlay {
+            position: relative;
+            z-index: 3;
+            color: var(--text-light);
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .status-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-title {
+            font-size: 14px;
+            color: #8e8e93;
+        }
+
+        .status-value {
+            font-size: 22px;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+
+        .status-value.ok { color: #4cd964; }
+        .status-value.warn { color: #ffcc00; }
+        .status-value.alert { color: #ff3b30; animation: flash 0.5s infinite alternate; }
+
+        @keyframes flash { 0% { opacity: 1; } 100% { opacity: 0.4; } }
+
+        .log-box-mini {
+            font-family: monospace;
+            font-size: 11px;
+            background: rgba(0,0,0,0.4);
+            padding: 6px;
+            border-radius: 4px;
+            height: 95px;
+            overflow-y: auto;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .log-line { margin-bottom: 4px; line-height: 1.2; color: #fff; }
+
+        /* 実物の下部物理ボタンエリア */
+        .button-matrix {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .hardware-btn {
+            background-color: var(--secom-white);
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            padding: 18px 10px;
+            font-size: 18px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 0 var(--border-color);
+            transition: all 0.1s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .hardware-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 0px 0 var(--border-color);
+        }
+
+        .hardware-btn.gaitsu {
+            color: var(--accent-red);
+            border-color: #ffb3b3;
+        }
+        .hardware-btn.zaitaku {
+            color: var(--accent-blue);
+            border-color: #b3d7ff;
+        }
+        
+        .btn-sub-label {
+            font-size: 11px;
+            font-weight: normal;
+            color: #666;
+        }
+
+        /* 通知用メールアドレス入力フォーム */
+        .email-settings-area {
+            background-color: #f2f2f7;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 15px;
+            font-size: 13px;
+        }
+
+        .email-settings-area label {
+            font-weight: bold;
+            color: #555;
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .email-input-field {
+            width: 100%;
+            padding: 8px;
+            background: #ffffff;
+            border: 1px solid var(--border-color);
+            color: #333;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 13px;
+        }
+
+        .hidden-inputs {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            gap: 10px;
+            font-size: 11px;
+        }
+        .hidden-inputs input { width: 50px; padding: 4px; }
     </style>
-  </head>
-  <body>
-    <div class="login-card">
-      <h2>新聞係専用</h2>
-      <input type="password" id="pass" placeholder="パスワードを入力" onkeypress="if(event.key==='Enter')login()">
-      
-      <div class="button-area">
-        <button id="btn" onclick="login()">ログイン</button>
-        <div id="loader" class="loader"></div>
-      </div>
-      
-      <div id="msg"></div>
+</head>
+<body>
+
+<div class="secom-hardware">
+    <div class="hardware-header">
+        <span>SECOM Style</span>
+        <span style="color: var(--accent-red);">非常</span>
     </div>
 
-    <script>
-      function login() {
-        const pass = document.getElementById('pass').value;
-        const btn = document.getElementById('btn');
-        const loader = document.getElementById('loader');
-        const msg = document.getElementById('msg');
+    <!-- 通知用メールアドレス入力エリア（自動保存機能付き） -->
+    <div class="email-settings-area">
+        <label>📧 通知先メールアドレス（カンマ区切りで複数可）:</label>
+        <input type="text" id="target-emails" class="email-input-field" placeholder="example1@mail.com, example2@mail.com">
+    </div>
 
-        // ボタンを消してローディングを表示
-        btn.style.display = 'none';
-        loader.style.display = 'block';
-        msg.innerText = "";
+    <div class="液晶画面">
+        <video id="webcam" autoplay playsinline muted></video>
+        <canvas id="motion-canvas"></canvas>
         
-        google.script.run.withSuccessHandler(url => {
-          if (url === "error") {
-            // エラーならボタンを戻す
-            btn.style.display = 'block';
-            loader.style.display = 'none';
-            msg.innerText = "パスワードが正しくありません";
-          } else {
-            msg.style.color = "#188038";
-            msg.innerText = "しばらくお待ち下さい...";
-            window.top.location.href = url;
-          }
-        }).checkPassword(pass);
-      }
-    </script>
-  </body>
+        <div class="screen-overlay">
+            <div class="status-display">
+                <span class="status-title">現在の状態</span>
+                <span id="status-text" class="status-value ok">警戒中 (ARM)</span>
+            </div>
+            
+            <div class="log-box-mini" id="log-box"></div>
+        </div>
+    </div>
+
+    <div class="button-matrix">
+        <button class="hardware-btn gaitsu" onclick="setArmed(true)">
+            <span>外出セコム</span>
+            <span class="btn-sub-label">警備を開始する</span>
+        </button>
+        <button class="hardware-btn zaitaku" onclick="setArmed(false)">
+            <span>警備 解除</span>
+            <span class="btn-sub-label">お帰りなさいませ</span>
+        </button>
+    </div>
+
+    <div class="hidden-inputs">
+        <div>退出猶予:<input type="number" id="start-delay" value="10">秒</div>
+        <div>検知持続:<input type="number" id="required-duration" value="3">秒</div>
+        <div>解除猶予:<input type="number" id="alert-delay" value="5">秒</div>
+    </div>
+</div>
+
+<script>
+    let sysState = "ARMED"; 
+    let video = document.getElementById('webcam');
+    let canvas = document.getElementById('motion-canvas');
+    let ctx = canvas.getContext('2d');
+    
+    // 高感度で遠くを捉えるため解像度設定(64x48)
+    let compareCanvas = document.createElement('canvas');
+    compareCanvas.width = 64;
+    compareCanvas.height = 48;
+    let compareCtx = compareCanvas.getContext('2d');
+    
+    let prevFrameData = null;
+    let motionStartTime = null;   
+    let preAlertStartTime = null; 
+    let armStartTime = Date.now(); 
+    let lastAlertTime = 0;
+    let beepInterval = null;
+
+    const audioKaisi = new Audio('kaisi.mp3');
+    const audioKaizyo = new Audio('kaizyo.mp3');
+    const audioKennti = new Audio('kennti.mp3');
+
+    // メールアドレス入力値のローカル自動復元・保存
+    const emailInput = document.getElementById('target-emails');
+    if (localStorage.getItem('secom_saved_emails')) {
+        emailInput.value = localStorage.getItem('secom_saved_emails');
+    }
+    emailInput.addEventListener('input', (e) => {
+        localStorage.setItem('secom_saved_emails', e.target.value);
+    });
+
+    function addLog(type, message) {
+        const logBox = document.getElementById('log-box');
+        const timestamp = new Date().toLocaleTimeString();
+        const entry = document.createElement('div');
+        entry.className = "log-line";
+        entry.innerHTML = `[${timestamp}] ${message}`;
+        logBox.insertBefore(entry, logBox.firstChild);
+    }
+    // あなたが取得してくれた最新のGAS URLです
+    const gasWebhookUrl = "https://google.com";
+
+    function setArmed(status) {
+        const text = document.getElementById('status-text');
+        
+        if (status) {
+            const startDelaySec = parseFloat(document.getElementById('start-delay').value);
+            if (startDelaySec > 0) {
+                sysState = "START_DELAY";
+                armStartTime = Date.now();
+                text.className = 'status-value warn';
+                text.innerText = `退出猶予中`;
+                addLog('warn', `⏳ 警備開始まで ${startDelaySec} 秒`);
+                audioKaisi.play().catch(e => console.log("再生制限:", e));
+            } else {
+                sysState = "ARMED";
+                text.className = 'status-value ok';
+                text.innerText = '警戒中 (ARM)';
+                addLog('info', '警戒モードに設定。');
+                audioKaisi.play().catch(e => console.log("再生制限:", e));
+            }
+        } else {
+            if (sysState === "PRE_ALERT" || sysState === "ALERTING") {
+                addLog('info', '❌ 解除されたため、自動メール通報をキャンセルしました。');
+            }
+            
+            sysState = "DISARMED";
+            text.className = 'status-value';
+            text.style.color = '#8e8e93';
+            text.innerText = '警備解除';
+            addLog('info', '警備を解除しました。');
+            audioKaizyo.play().catch(e => console.log("再生制限:", e));
+            
+            stopAlarm();
+            stopBeep();
+            motionStartTime = null;
+            preAlertStartTime = null;
+        }
+    }
+
+    async function setupCamera() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, 
+                audio: false 
+            });
+            video.srcObject = stream;
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                addLog('info', '高感度モードで起動完了。');
+                setArmed(true);
+                requestAnimationFrame(detectMotion);
+            };
+        } catch (err) {
+            addLog('alert', 'カメラの起動に失敗しました。');
+        }
+    }
+
+    function startBeep() {
+        if (beepInterval) return;
+        let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        beepInterval = setInterval(() => {
+            if (sysState !== "PRE_ALERT") return;
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(2000, audioCtx.currentTime); 
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        }, 1000);
+    }
+
+    function stopBeep() {
+        if (beepInterval) {
+            clearInterval(beepInterval);
+            beepInterval = null;
+        }
+    }
+
+    function startAlarm() {
+        if (sysState === "ALERTING") return;
+        sysState = "ALERTING";
+        stopBeep();
+        
+        addLog('alert', `🚨 侵入者検知！【kennti.mp3】をループ再生します。`);
+
+        const text = document.getElementById('status-text');
+        text.className = 'status-value alert';
+        text.innerText = '🚨 異常発生';
+
+        audioKennti.loop = true;
+        audioKennti.play().catch(err => console.log("オーディオ再生エラー:", err));
+    }
+
+    function stopAlarm() {
+        audioKennti.pause();
+        audioKennti.currentTime = 0;
+    }
+
+    // GASが100%パースできる形式にデータ構造を修正した送信関数
+    async function sendGasEmailNotification(messageText) {
+        const emails = document.getElementById('target-emails').value.trim();
+        if (!emails || !gasWebhookUrl) {
+            addLog('warn', '⚠️ メールアドレスが未入力です。');
+            return;
+        }
+
+        try {
+            // GAS側の「JSON.parse」がエラーを起こさないよう、完全にプレーンなオブジェクトで送信
+            const payload = {
+                message: messageText,
+                emails: emails
+            };
+
+            await fetch(gasWebhookUrl, {
+                method: "POST",
+                mode: "no-cors", 
+                body: JSON.stringify(payload)
+            });
+            addLog('info', `📱 登録されたすべての宛先へ自動メール通報を送信しました。`);
+        } catch (e) { 
+            console.log("GAS送信エラー", e); 
+        }
+    }
+
+    function detectMotion() {
+        if (video.readyState === video.HAVE_ENOUGH_DATA) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const now = Date.now();
+
+            if (sysState === "START_DELAY") {
+                const startDelaySec = parseFloat(document.getElementById('start-delay').value);
+                const elapsed = (now - armStartTime) / 1000;
+                if (elapsed >= startDelaySec) {
+                    sysState = "ARMED";
+                    const text = document.getElementById('status-text');
+                    text.className = 'status-value ok';
+                    text.innerText = '警戒中 (ARM)';
+                    addLog('info', '🛡️ 警備システム作動。');
+                }
+            }
+            
+            if (sysState === "ARMED" || sysState === "PRE_ALERT" || sysState === "ALERTING") {
+                compareCtx.drawImage(video, 0, 0, compareCanvas.width, compareCanvas.height);
+                let frame = compareCtx.getImageData(0, 0, compareCanvas.width, compareCanvas.height);
+                let length = frame.data.length;
+                
+                if (prevFrameData) {
+                    let changedPixels = 0;
+                    for (let i = 0; i < length; i += 4) {
+                        let rDiff = Math.abs(frame.data[i] - prevFrameData.data[i]);
+                        let gDiff = Math.abs(frame.data[i+1] - prevFrameData.data[i+1]);
+                        let bDiff = Math.abs(frame.data[i+2] - prevFrameData.data[i+2]);
+                        if ((rDiff + gDiff + bDiff) > 40) changedPixels++;
+                    }
+
+                    let motionThreshold = (compareCanvas.width * compareCanvas.height) * 0.005;
+                    let isMoving = changedPixels > motionThreshold;
+                    
+                    const requiredDuration = parseFloat(document.getElementById('required-duration').value) * 1000;
+                    const alertDelay = parseFloat(document.getElementById('alert-delay').value) * 1000;
+
+                    if (isMoving) {
+                        ctx.fillStyle = 'rgba(255, 23, 68, 0.15)';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        
+                        if (sysState === "ARMED") {
+                            if (!motionStartTime) {
+                                motionStartTime = now;
+                            } else {
+                                let duration = now - motionStartTime;
+                                if (duration >= requiredDuration) {
+                                    sysState = "PRE_ALERT";
+                                    preAlertStartTime = now;
+                                    addLog('warn', `🚨 不審動体検知！`);
+                                    startBeep();
+                                }
+                            }
+                        } else if (sysState === "PRE_ALERT") {
+                            let preAlertElapsed = now - preAlertStartTime;
+                            if (preAlertElapsed >= alertDelay) {
+                                startAlarm();
+                                const timeStr = new Date().toLocaleString();
+                                sendGasEmailNotification(`【マイセコム警告】\n\nセキュリティシステムが異常を検知しました。\n発生時刻: ${timeStr}\n\n登録された宛先へ自動通報を行いました。直ちに確認してください。`);
+                            }
+                        }
+                    } else {
+                        if (motionStartTime && sysState === "ARMED") motionStartTime = null;
+                    }
+                }
+                prevFrameData = frame;
+            }
+        }
+        requestAnimationFrame(detectMotion);
+    }
+
+    window.onload = () => {
+        setupCamera();
+    };
+</script>
+</body>
 </html>
